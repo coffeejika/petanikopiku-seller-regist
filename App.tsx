@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { CoffeeIcon, UserIcon, ShieldIcon, CheckIcon, BotIcon } from './components/Icons.tsx';
-import { RegistrationData, Step } from './types.ts';
-import { getSellerAssistance, generateProfessionalSummary } from './services/geminiService.ts';
+import { CoffeeIcon, UserIcon, ShieldIcon, CheckIcon, BotIcon } from './components/Icons';
+import { RegistrationData, Step } from './types';
+import { getSellerAssistance, generateProfessionalSummary } from './services/geminiService';
 
 const ADMIN_WA_NUMBER = "+6287725071919";
 
