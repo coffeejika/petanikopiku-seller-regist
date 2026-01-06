@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { CoffeeIcon, UserIcon, ShieldIcon, CheckIcon, BotIcon } from './components/Icons';
-import { RegistrationData, Step } from './types';
-import { getSellerAssistance, generateProfessionalSummary } from './services/geminiService';
+import { CoffeeIcon, UserIcon, ShieldIcon, CheckIcon, BotIcon } from './components/Icons.tsx';
+import { RegistrationData, Step } from './types.ts';
+import { getSellerAssistance, generateProfessionalSummary } from './services/geminiService.ts';
 
 const ADMIN_WA_NUMBER = "+6287725071919";
 
@@ -20,7 +20,6 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(true);
 
   useEffect(() => {
-    // Pengecekan aman saat aplikasi dimuat
     const checkConfig = () => {
       try {
         const key = process?.env?.API_KEY;
@@ -56,12 +55,12 @@ const App: React.FC = () => {
 
   const askAI = async () => {
     if (!hasApiKey) {
-      setAiResponse("Asisten AI saat ini tidak aktif karena API Key belum dikonfigurasi di GitHub Secrets.");
+      setAiResponse("Fitur AI dinonaktifkan. Silakan isi form secara manual.");
       return;
     }
     setIsAiLoading(true);
     const context = `Langkah: ${currentStep}. Data: ${JSON.stringify(data[currentStep === 'summary' ? 'profile' : (currentStep as keyof RegistrationData)])}`;
-    const res = await getSellerAssistance("Bantu saya memahami bagian ini.", context);
+    const res = await getSellerAssistance("Bantu saya mengisi bagian ini.", context);
     setAiResponse(res);
     setIsAiLoading(false);
   };
@@ -69,16 +68,13 @@ const App: React.FC = () => {
   const submitToWhatsApp = async () => {
     setIsSubmitting(true);
     const summary = await generateProfessionalSummary(data);
-    
     const message = summary || `*Pendaftaran Mitra Petanikopiku*\n\nNama: ${data.profile.fullName}\nToko: ${data.store.storeName}\nNIK: ${data.verification.ktpNumber}`;
-    
     window.open(`https://wa.me/${ADMIN_WA_NUMBER.replace('+', '')}?text=${encodeURIComponent(message)}`, '_blank');
     setIsSubmitting(false);
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center py-8 px-4 bg-[#fdfbf7]">
-      {/* Header */}
       <div className="w-full max-w-2xl mb-8 text-center">
         <div className="flex justify-center items-center gap-2 mb-2">
           <div className="p-2 bg-emerald-800 rounded-lg text-white">
@@ -87,13 +83,12 @@ const App: React.FC = () => {
           <h1 className="text-2xl font-bold text-emerald-900">Petanikopiku</h1>
         </div>
         {!hasApiKey && (
-          <div className="inline-block bg-amber-50 border border-amber-200 text-amber-700 text-[10px] px-3 py-1 rounded-full font-medium">
-            ⚠️ Mode Terbatas (AI Off)
+          <div className="inline-block bg-amber-50 border border-amber-200 text-amber-700 text-[10px] px-3 py-1 rounded-full">
+            ⚠️ AI Mode Off
           </div>
         )}
       </div>
 
-      {/* Stepper */}
       <div className="w-full max-w-2xl mb-8 flex justify-between px-4">
         {steps.map((s, idx) => {
           const active = currentStep === s.key;
@@ -111,10 +106,9 @@ const App: React.FC = () => {
         })}
       </div>
 
-      {/* Form Card */}
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl shadow-emerald-900/5 p-6 md:p-8 border border-emerald-50">
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-6 border border-emerald-50">
         {currentStep === 'profile' && (
-          <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="space-y-4">
             <h2 className="text-lg font-bold text-emerald-900">Profil Penjual</h2>
             <input 
               className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
@@ -138,7 +132,7 @@ const App: React.FC = () => {
         )}
 
         {currentStep === 'store' && (
-          <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="space-y-4">
             <h2 className="text-lg font-bold text-emerald-900">Rincian Toko</h2>
             <input 
               className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
@@ -157,7 +151,7 @@ const App: React.FC = () => {
         )}
 
         {currentStep === 'verification' && (
-          <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="space-y-4">
             <h2 className="text-lg font-bold text-emerald-900">Keamanan</h2>
             <input 
               className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
@@ -168,7 +162,7 @@ const App: React.FC = () => {
             />
             <div className="border-2 border-dashed border-emerald-100 rounded-2xl p-8 text-center bg-emerald-50/30 relative">
               {data.verification.ktpPhotoPreview ? (
-                <img src={data.verification.ktpPhotoPreview} className="max-h-40 mx-auto rounded-lg" />
+                <img src={data.verification.ktpPhotoPreview} className="max-h-40 mx-auto rounded-lg" alt="Preview" />
               ) : (
                 <div className="text-emerald-400">Klik untuk Unggah Foto KTP</div>
               )}
@@ -178,12 +172,12 @@ const App: React.FC = () => {
         )}
 
         {currentStep === 'summary' && (
-          <div className="text-center space-y-4 animate-in zoom-in duration-500">
+          <div className="text-center space-y-4">
             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
               <CheckIcon className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-emerald-900">Siap Bergabung!</h2>
-            <p className="text-sm text-emerald-600">Klik tombol di bawah untuk mengirim data ke Admin WhatsApp kami.</p>
+            <p className="text-sm text-emerald-600">Klik tombol di bawah untuk verifikasi WhatsApp.</p>
           </div>
         )}
 
@@ -200,24 +194,23 @@ const App: React.FC = () => {
             else if (currentStep === 'store') setCurrentStep('verification');
             else if (currentStep === 'verification') setCurrentStep('summary');
             else submitToWhatsApp();
-          }} className="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-emerald-800 hover:bg-emerald-900 transition-colors">
+          }} className="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-emerald-800 hover:bg-emerald-900">
             {currentStep === 'summary' ? (isSubmitting ? 'Mengirim...' : 'Kirim WhatsApp') : 'Lanjutkan'}
           </button>
         </div>
       </div>
 
-      {/* AI Bot FAB */}
-      <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3 pointer-events-none">
+      <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3">
         {aiResponse && (
-          <div className="bg-white p-4 rounded-2xl shadow-2xl border border-emerald-50 max-w-[260px] text-xs pointer-events-auto animate-in slide-in-from-bottom-4">
+          <div className="bg-white p-4 rounded-2xl shadow-2xl border border-emerald-50 max-w-[260px] text-xs">
             <button onClick={() => setAiResponse('')} className="float-right text-emerald-300 ml-2">✕</button>
-            <p className="font-bold text-emerald-800 mb-1">🤖 AI Asisten:</p>
+            <p className="font-bold text-emerald-800 mb-1">🤖 Asisten:</p>
             {aiResponse}
           </div>
         )}
         <button 
           onClick={askAI}
-          className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform active:scale-90 pointer-events-auto ${hasApiKey ? 'bg-emerald-800 text-white' : 'bg-emerald-100 text-emerald-300'}`}
+          className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center ${hasApiKey ? 'bg-emerald-800 text-white' : 'bg-emerald-100 text-emerald-300'}`}
         >
           {isAiLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" /> : <BotIcon className="w-6 h-6" />}
         </button>
