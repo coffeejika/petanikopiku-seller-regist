@@ -9,12 +9,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <script>
-      // Sediakan objek process minimal agar aplikasi tidak crash jika process.env dipanggil
-      window.process = { 
-        env: { 
-          API_KEY: "" 
-        } 
-      };
+      // Polyfill global untuk mencegah error jika process.env diakses sebelum sistem siap
+      window.process = window.process || { env: { API_KEY: "" } };
+      if (!window.process.env) window.process.env = { API_KEY: "" };
     </script>
 
     <script type="importmap">
@@ -24,7 +21,6 @@
     "react-dom": "https://esm.sh/react-dom@18.2.0",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
-    "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime",
     "@google/genai": "https://esm.sh/@google/genai",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
@@ -35,6 +31,7 @@
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: #fdfbf7;
+            margin: 0;
         }
         #root:empty::before {
             content: "Memuat Aplikasi Petanikopiku...";
@@ -43,7 +40,8 @@
             align-items: center;
             height: 100vh;
             color: #065f46;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 1rem;
         }
     </style>
 </head>
