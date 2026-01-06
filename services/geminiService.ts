@@ -1,60 +1,56 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-// Fungsi helper untuk mengambil API Key secara aman
-const getApiKey = () => {
+// Fungsi helper yang lebih aman untuk mendeteksi API Key
+const getSafeApiKey = (): string => {
   try {
-    return process.env.API_KEY || "";
+    // Mengecek apakah process.env ada dan memiliki API_KEY
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
+    }
+    return "";
   } catch (e) {
-    // Jika process.env tidak didefinisikan (di browser), kembalikan string kosong
     return "";
   }
 };
 
-const apiKey = getApiKey();
-
 export const getSellerAssistance = async (query: string, context: string) => {
+  const apiKey = getSafeApiKey();
+  
   if (!apiKey) {
-    return "Catatan: API Key belum dikonfigurasi. Silakan hubungi admin atau cek pengaturan GitHub Secrets Anda.";
+    return "Maaf, fitur asisten AI saat ini tidak tersedia karena konfigurasi kunci belum lengkap. Anda tetap dapat melanjutkan pengisian formulir secara manual.";
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `You are a helpful assistant for Petanikopiku, a coffee commerce platform. 
-      The user is a seller (penjual) registering their store (toko). 
-      Current form context: ${context}
-      User question: ${query}`,
+      contents: `Konteks Form: ${context}\n\nPertanyaan User: ${query}`,
       config: {
-        systemInstruction: "Answer briefly and warmly in Indonesian. Help the seller understand why we need their 'Nama Toko', 'Alamat Toko', 'Estimasi Penjualan', or why we need their KTP. Address them as 'Mitra Penjual' or 'Pemilik Toko'.",
+        systemInstruction: "Anda adalah asisten pendaftaran mitra toko di platform Petanikopiku. Jawab dengan ramah, singkat, dan gunakan Bahasa Indonesia yang mendukung.",
         temperature: 0.7,
       },
     });
     return response.text;
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Maaf, saya sedang mengalami kendala teknis. Silakan lanjutkan pengisian formulir pendaftaran toko Anda.";
+    console.error("Gemini API Error:", error);
+    return "Terjadi kendala koneksi dengan asisten AI. Silakan lanjutkan pendaftaran Anda.";
   }
 };
 
 export const generateProfessionalSummary = async (data: any) => {
+  const apiKey = getSafeApiKey();
   if (!apiKey) return null;
 
   try {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate a professional registration summary for a coffee store owner (penjual) with these details: ${JSON.stringify(data)}. 
-      The summary will be sent to an admin via WhatsApp. 
-      Format it neatly with emojis and clear sections. Use formal Indonesian. Use the term 'Informasi Toko'.`,
-      config: {
-        temperature: 0.5,
-      },
+      contents: `Buat ringkasan pendaftaran profesional untuk data berikut: ${JSON.stringify(data)}. Gunakan format rapi untuk WhatsApp.`,
+      config: { temperature: 0.5 },
     });
     return response.text;
   } catch (error) {
-    console.error("Summary Generation Error:", error);
     return null;
   }
 };

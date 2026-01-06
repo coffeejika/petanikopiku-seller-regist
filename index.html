@@ -7,6 +7,16 @@
     <title>Petanikopiku Partner Registration</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Script untuk mencegah error 'process is not defined' di GitHub Pages -->
+    <script>
+      window.process = {
+        env: {
+          API_KEY: "" 
+        }
+      };
+    </script>
+
     <script type="importmap">
 {
   "imports": {
@@ -29,21 +39,21 @@
         .step-transition {
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        /* Loading state for blank page prevention */
+        /* State saat root masih kosong */
         #root:empty::before {
-            content: "Memuat Aplikasi...";
+            content: "Memuat Aplikasi Petanikopiku...";
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             color: #065f46;
             font-weight: bold;
+            font-family: sans-serif;
         }
     </style>
 </head>
 <body>
     <div id="root"></div>
-    <!-- Penambahan script type module untuk entry point -->
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>

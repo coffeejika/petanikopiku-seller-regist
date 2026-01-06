@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CoffeeIcon, UserIcon, ShieldIcon, CheckIcon, BotIcon } from './components/Icons';
 import { RegistrationData, Step } from './types';
 import { getSellerAssistance, generateProfessionalSummary } from './services/geminiService';
@@ -19,380 +19,207 @@ const App: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(true);
 
-  // Cek ketersediaan API Key saat startup
   useEffect(() => {
-    try {
-      if (!process.env.API_KEY) {
+    // Pengecekan aman saat aplikasi dimuat
+    const checkConfig = () => {
+      try {
+        const key = process?.env?.API_KEY;
+        if (!key || key === "") {
+          setHasApiKey(false);
+        }
+      } catch (e) {
         setHasApiKey(false);
       }
-    } catch (e) {
-      setHasApiKey(false);
-    }
+    };
+    checkConfig();
   }, []);
 
   const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
-    { key: 'profile', label: 'Profil Penjual', icon: <UserIcon className="w-5 h-5" /> },
-    { key: 'store', label: 'Rincian Toko', icon: <CoffeeIcon className="w-5 h-5" /> },
-    { key: 'verification', label: 'Verifikasi Keamanan', icon: <ShieldIcon className="w-5 h-5" /> },
+    { key: 'profile', label: 'Profil', icon: <UserIcon className="w-5 h-5" /> },
+    { key: 'store', label: 'Toko', icon: <CoffeeIcon className="w-5 h-5" /> },
+    { key: 'verification', label: 'Keamanan', icon: <ShieldIcon className="w-5 h-5" /> },
   ];
-
-  const updateProfile = (fields: Partial<RegistrationData['profile']>) => {
-    setData(prev => ({ ...prev, profile: { ...prev.profile, ...fields } }));
-  };
-
-  const updateStore = (fields: Partial<RegistrationData['store']>) => {
-    setData(prev => ({ ...prev, store: { ...prev.store, ...fields } }));
-  };
-
-  const updateVerification = (fields: Partial<RegistrationData['verification']>) => {
-    setData(prev => ({ ...prev, verification: { ...prev.verification, ...fields } }));
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        updateVerification({ ktpPhoto: file, ktpPhotoPreview: reader.result as string });
+        setData(prev => ({ 
+          ...prev, 
+          verification: { ...prev.verification, ktpPhoto: file, ktpPhotoPreview: reader.result as string } 
+        }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleNext = () => {
-    if (currentStep === 'profile') setCurrentStep('store');
-    else if (currentStep === 'store') setCurrentStep('verification');
-    else if (currentStep === 'verification') setCurrentStep('summary');
-  };
-
-  const handleBack = () => {
-    if (currentStep === 'store') setCurrentStep('profile');
-    else if (currentStep === 'verification') setCurrentStep('store');
-    else if (currentStep === 'summary') setCurrentStep('verification');
-  };
-
   const askAI = async () => {
+    if (!hasApiKey) {
+      setAiResponse("Asisten AI saat ini tidak aktif karena API Key belum dikonfigurasi di GitHub Secrets.");
+      return;
+    }
     setIsAiLoading(true);
-    const context = `Seller is at step ${currentStep}. Data so far: ${JSON.stringify(data[currentStep === 'summary' ? 'profile' : currentStep])}`;
-    const res = await getSellerAssistance("Jelaskan langkah ini dan apa yang harus saya siapkan sebagai pemilik toko?", context);
+    const context = `Langkah: ${currentStep}. Data: ${JSON.stringify(data[currentStep === 'summary' ? 'profile' : (currentStep as keyof RegistrationData)])}`;
+    const res = await getSellerAssistance("Bantu saya memahami bagian ini.", context);
     setAiResponse(res);
     setIsAiLoading(false);
   };
 
   const submitToWhatsApp = async () => {
     setIsSubmitting(true);
-    const professionalSummary = await generateProfessionalSummary(data);
+    const summary = await generateProfessionalSummary(data);
     
-    const baseMessage = professionalSummary || `
-*Pendaftaran Mitra Penjual Baru - Petanikopiku*
-
-*Profil Penjual:*
-- Nama: ${data.profile.fullName}
-- No. HP: ${data.profile.phone}
-- Domisili: ${data.profile.regency}, ${data.profile.province}
-
-*Rincian Toko:*
-- Nama Toko: ${data.store.storeName}
-- Alamat Toko: ${data.store.storeAddress}
-- Estimasi Penjualan: ${data.store.annualSales} kg/tahun
-
-*Verifikasi:*
-- No KTP: ${data.verification.ktpNumber}
-    `.trim();
-
-    const encodedMessage = encodeURIComponent(baseMessage);
-    const waLink = `https://wa.me/${ADMIN_WA_NUMBER.replace('+', '')}?text=${encodedMessage}`;
+    const message = summary || `*Pendaftaran Mitra Petanikopiku*\n\nNama: ${data.profile.fullName}\nToko: ${data.store.storeName}\nNIK: ${data.verification.ktpNumber}`;
     
-    window.open(waLink, '_blank');
+    window.open(`https://wa.me/${ADMIN_WA_NUMBER.replace('+', '')}?text=${encodeURIComponent(message)}`, '_blank');
     setIsSubmitting(false);
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center py-8 px-4 bg-[#fdfbf7]">
-      {/* Warning Bar if API Key is missing */}
-      {!hasApiKey && (
-        <div className="w-full max-w-2xl bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded-r-xl shadow-sm animate-pulse">
-          <p className="text-xs font-bold">⚠️ KONFIGURASI DIPERLUKAN</p>
-          <p className="text-[10px]">Aplikasi berjalan dalam mode terbatas (AI dinonaktifkan). Pastikan Anda telah menyetel GEMINI_API_KEY di GitHub Secrets dan menggunakan GitHub Actions untuk deploy.</p>
-        </div>
-      )}
-
       {/* Header */}
-      <div className="w-full max-w-2xl mb-10 text-center">
+      <div className="w-full max-w-2xl mb-8 text-center">
         <div className="flex justify-center items-center gap-2 mb-2">
           <div className="p-2 bg-emerald-800 rounded-lg text-white">
-            <CoffeeIcon className="w-8 h-8" />
+            <CoffeeIcon className="w-7 h-7" />
           </div>
-          <h1 className="text-3xl font-bold text-emerald-900 tracking-tight">Petanikopiku</h1>
+          <h1 className="text-2xl font-bold text-emerald-900">Petanikopiku</h1>
         </div>
-        <p className="text-emerald-700/80 font-medium">Registrasi Mitra Strategis Penjual Kopi</p>
+        {!hasApiKey && (
+          <div className="inline-block bg-amber-50 border border-amber-200 text-amber-700 text-[10px] px-3 py-1 rounded-full font-medium">
+            ⚠️ Mode Terbatas (AI Off)
+          </div>
+        )}
       </div>
 
-      {/* Progress Stepper */}
-      <div className="w-full max-w-2xl mb-8">
-        <div className="flex justify-between relative">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-emerald-100 -translate-y-1/2 z-0"></div>
-          {steps.map((s, idx) => {
-            const isActive = currentStep === s.key;
-            const isCompleted = steps.findIndex(st => st.key === currentStep) > idx || currentStep === 'summary';
-            return (
-              <div key={s.key} className="relative z-10 flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isActive ? 'bg-emerald-600 text-white ring-4 ring-emerald-100' : 
-                  isCompleted ? 'bg-green-500 text-white' : 'bg-white border-2 border-emerald-200 text-emerald-300'
-                }`}>
-                  {isCompleted ? <CheckIcon className="w-6 h-6" /> : s.icon}
-                </div>
-                <span className={`text-[10px] mt-2 font-bold uppercase tracking-wider ${isActive ? 'text-emerald-800' : 'text-emerald-400'}`}>
-                  {s.label}
-                </span>
+      {/* Stepper */}
+      <div className="w-full max-w-2xl mb-8 flex justify-between px-4">
+        {steps.map((s, idx) => {
+          const active = currentStep === s.key;
+          const done = steps.findIndex(st => st.key === currentStep) > idx || currentStep === 'summary';
+          return (
+            <div key={s.key} className="flex flex-col items-center flex-1 relative">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-colors ${
+                active ? 'bg-emerald-700 text-white' : done ? 'bg-green-500 text-white' : 'bg-white border-2 border-emerald-100 text-emerald-200'
+              }`}>
+                {done ? <CheckIcon className="w-5 h-5" /> : s.icon}
               </div>
-            );
-          })}
-        </div>
+              <span className={`text-[9px] mt-2 font-bold uppercase ${active ? 'text-emerald-800' : 'text-emerald-300'}`}>{s.label}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Form Content */}
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl shadow-emerald-900/5 p-8 border border-emerald-50 relative overflow-hidden">
-        
-        {/* Step 1: Profile */}
+      {/* Form Card */}
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl shadow-emerald-900/5 p-6 md:p-8 border border-emerald-50">
         {currentStep === 'profile' && (
-          <div className="step-transition">
-            <h2 className="text-xl font-bold text-emerald-900 mb-6">Informasi Dasar Penjual</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Nama Lengkap Sesuai KTP</label>
-                <input 
-                  type="text"
-                  value={data.profile.fullName}
-                  onChange={e => updateProfile({ fullName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="Contoh: Budi Santoso"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Nomor WhatsApp</label>
-                <input 
-                  type="tel"
-                  value={data.profile.phone}
-                  onChange={e => updateProfile({ phone: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="62812xxx"
-                />
-              </div>
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Alamat Domisili</label>
-                <textarea 
-                  value={data.profile.address}
-                  onChange={e => updateProfile({ address: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all h-24"
-                  placeholder="Nama Jalan, No. Rumah, Desa/Kelurahan"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Provinsi</label>
-                <input 
-                  type="text"
-                  value={data.profile.province}
-                  onChange={e => updateProfile({ province: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="Sumatera Selatan"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Kabupaten/Kota</label>
-                <input 
-                  type="text"
-                  value={data.profile.regency}
-                  onChange={e => updateProfile({ regency: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="Lahat"
-                />
-              </div>
-            </div>
+          <div className="space-y-4 animate-in fade-in duration-500">
+            <h2 className="text-lg font-bold text-emerald-900">Profil Penjual</h2>
+            <input 
+              className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
+              placeholder="Nama Lengkap" 
+              value={data.profile.fullName}
+              onChange={e => setData({...data, profile: {...data.profile, fullName: e.target.value}})}
+            />
+            <input 
+              className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
+              placeholder="WhatsApp (628...)" 
+              value={data.profile.phone}
+              onChange={e => setData({...data, profile: {...data.profile, phone: e.target.value}})}
+            />
+            <textarea 
+              className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500 h-24" 
+              placeholder="Alamat Lengkap"
+              value={data.profile.address}
+              onChange={e => setData({...data, profile: {...data.profile, address: e.target.value}})}
+            />
           </div>
         )}
 
-        {/* Step 2: Store */}
         {currentStep === 'store' && (
-          <div className="step-transition">
-            <h2 className="text-xl font-bold text-emerald-900 mb-6">Informasi Toko Kopi</h2>
-            <div className="grid grid-cols-1 gap-6">
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Nama Toko</label>
-                <input 
-                  type="text"
-                  value={data.store.storeName}
-                  onChange={e => updateStore({ storeName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="Contoh: Kopi Jaya Makmur"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Alamat Lengkap Toko</label>
-                <textarea 
-                  value={data.store.storeAddress}
-                  onChange={e => updateStore({ storeAddress: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all h-24"
-                  placeholder="Alamat operasional toko..."
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Estimasi Penjualan Per Tahun (Kg)</label>
-                <input 
-                  type="number"
-                  value={data.store.annualSales}
-                  onChange={e => updateStore({ annualSales: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="Misal: 1000"
-                />
-              </div>
-            </div>
+          <div className="space-y-4 animate-in fade-in duration-500">
+            <h2 className="text-lg font-bold text-emerald-900">Rincian Toko</h2>
+            <input 
+              className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
+              placeholder="Nama Toko" 
+              value={data.store.storeName}
+              onChange={e => setData({...data, store: {...data.store, storeName: e.target.value}})}
+            />
+            <input 
+              className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
+              placeholder="Estimasi Produksi (kg/tahun)" 
+              type="number"
+              value={data.store.annualSales}
+              onChange={e => setData({...data, store: {...data.store, annualSales: e.target.value}})}
+            />
           </div>
         )}
 
-        {/* Step 3: Verification */}
         {currentStep === 'verification' && (
-          <div className="step-transition">
-            <h2 className="text-xl font-bold text-emerald-900 mb-6">Verifikasi Identitas Penjual</h2>
-            <div className="space-y-6">
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Nomor NIK KTP (16 Digit)</label>
-                <input 
-                  type="text"
-                  maxLength={16}
-                  value={data.verification.ktpNumber}
-                  onChange={e => updateVerification({ ktpNumber: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  placeholder="16 digit nomor induk kependudukan"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-emerald-800 ml-1">Foto KTP Asli</label>
-                <div className={`relative w-full h-48 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${
-                  data.verification.ktpPhotoPreview ? 'border-green-400 bg-green-50' : 'border-emerald-200 bg-emerald-50'
-                }`}>
-                  {data.verification.ktpPhotoPreview ? (
-                    <div className="relative w-full h-full p-2">
-                      <img src={data.verification.ktpPhotoPreview} alt="KTP Preview" className="w-full h-full object-contain rounded-lg" />
-                      <button 
-                        onClick={() => updateVerification({ ktpPhoto: null, ktpPhotoPreview: null })}
-                        className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <ShieldIcon className="w-12 h-12 text-emerald-300 mb-2" />
-                      <p className="text-emerald-600 text-sm font-medium">Klik untuk Unggah Foto KTP</p>
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                      />
-                    </>
-                  )}
-                </div>
-                <p className="text-[10px] text-emerald-500 italic">*Data Anda aman dan hanya digunakan untuk verifikasi mitra internal.</p>
-              </div>
+          <div className="space-y-4 animate-in fade-in duration-500">
+            <h2 className="text-lg font-bold text-emerald-900">Keamanan</h2>
+            <input 
+              className="w-full p-3 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500" 
+              placeholder="NIK KTP (16 Digit)" 
+              maxLength={16}
+              value={data.verification.ktpNumber}
+              onChange={e => setData({...data, verification: {...data.verification, ktpNumber: e.target.value}})}
+            />
+            <div className="border-2 border-dashed border-emerald-100 rounded-2xl p-8 text-center bg-emerald-50/30 relative">
+              {data.verification.ktpPhotoPreview ? (
+                <img src={data.verification.ktpPhotoPreview} className="max-h-40 mx-auto rounded-lg" />
+              ) : (
+                <div className="text-emerald-400">Klik untuk Unggah Foto KTP</div>
+              )}
+              <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
             </div>
           </div>
         )}
 
-        {/* Final Step: Summary */}
         {currentStep === 'summary' && (
-          <div className="step-transition">
-            <h2 className="text-xl font-bold text-emerald-900 mb-4">Konfirmasi Pendaftaran</h2>
-            <div className="bg-emerald-50 rounded-2xl p-6 mb-6 space-y-4 border border-emerald-100">
-              <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
-                <span className="text-sm text-emerald-700 font-medium">Nama Penjual</span>
-                <span className="text-sm text-emerald-900 font-bold">{data.profile.fullName}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
-                <span className="text-sm text-emerald-700 font-medium">Nama Toko</span>
-                <span className="text-sm text-emerald-900 font-bold">{data.store.storeName}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
-                <span className="text-sm text-emerald-700 font-medium">Estimasi Sales</span>
-                <span className="text-sm text-emerald-900 font-bold">{data.store.annualSales} kg/tahun</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-emerald-700 font-medium">Status Dokumen</span>
-                <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-bold uppercase">Terunggah</span>
-              </div>
+          <div className="text-center space-y-4 animate-in zoom-in duration-500">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+              <CheckIcon className="w-8 h-8" />
             </div>
-            <p className="text-sm text-emerald-800 mb-6 text-center">
-              Informasi Toko Anda akan dikirimkan langsung ke admin melalui WhatsApp untuk verifikasi instan.
-            </p>
+            <h2 className="text-xl font-bold text-emerald-900">Siap Bergabung!</h2>
+            <p className="text-sm text-emerald-600">Klik tombol di bawah untuk mengirim data ke Admin WhatsApp kami.</p>
           </div>
         )}
 
-        {/* Footer Navigation */}
-        <div className="mt-10 flex gap-4">
+        <div className="mt-8 flex gap-3">
           {currentStep !== 'profile' && (
-            <button 
-              onClick={handleBack}
-              className="flex-1 py-4 px-6 rounded-2xl font-bold text-emerald-700 border-2 border-emerald-100 hover:bg-emerald-50 transition-all"
-            >
-              Kembali
-            </button>
+            <button onClick={() => {
+              if (currentStep === 'store') setCurrentStep('profile');
+              if (currentStep === 'verification') setCurrentStep('store');
+              if (currentStep === 'summary') setCurrentStep('verification');
+            }} className="px-6 py-3 rounded-xl font-bold text-emerald-700 border border-emerald-100">Kembali</button>
           )}
-          {currentStep !== 'summary' ? (
-            <button 
-              onClick={handleNext}
-              className="flex-[2] py-4 px-6 rounded-2xl font-bold text-white bg-emerald-800 hover:bg-emerald-900 shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2"
-            >
-              Lanjutkan
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </button>
-          ) : (
-            <button 
-              onClick={submitToWhatsApp}
-              disabled={isSubmitting}
-              className="flex-[2] py-4 px-6 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 transition-all flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? 'Mengirim...' : 'Kirim Ke WhatsApp Admin'}
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.012 2c-5.508 0-9.987 4.479-9.987 9.987 0 1.763.459 3.419 1.264 4.859L2 22l5.313-1.393a9.92 9.92 0 004.699 1.18c5.508 0 9.987-4.479 9.987-9.987s-4.479-9.987-9.987-9.987zm5.727 14.126c-.235.666-1.353 1.221-1.861 1.295-.469.068-.469.315-2.731-.588-2.261-.903-3.708-3.197-3.819-3.344-.112-.147-.91-1.21-.91-2.308s.574-1.637.778-1.859c.204-.222.444-.278.593-.278s.296.002.426.006c.141.004.33-.053.515.393.193.463.66 1.61.716 1.722.056.112.093.24.018.389-.074.148-.112.241-.222.371-.112.13-.235.291-.334.391-.112.112-.229.234-.1.455.129.222.571.94 1.228 1.524.847.754 1.56.987 1.782 1.098.222.112.352.093.481-.056.13-.148.556-.648.704-.87.148-.222.296-.185.5-.112.204.074 1.295.611 1.517.722s.37.166.426.259c.056.093.056.537-.179 1.203z"/>
-              </svg>
-            </button>
-          )}
+          <button onClick={() => {
+            if (currentStep === 'profile') setCurrentStep('store');
+            else if (currentStep === 'store') setCurrentStep('verification');
+            else if (currentStep === 'verification') setCurrentStep('summary');
+            else submitToWhatsApp();
+          }} className="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-emerald-800 hover:bg-emerald-900 transition-colors">
+            {currentStep === 'summary' ? (isSubmitting ? 'Mengirim...' : 'Kirim WhatsApp') : 'Lanjutkan'}
+          </button>
         </div>
       </div>
 
-      {/* AI Assistant FAB */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 max-w-[300px]">
+      {/* AI Bot FAB */}
+      <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3 pointer-events-none">
         {aiResponse && (
-          <div className="bg-white p-4 rounded-2xl shadow-xl border border-emerald-100 text-sm text-emerald-900 relative">
-            <button 
-              onClick={() => setAiResponse('')}
-              className="absolute -top-2 -right-2 bg-emerald-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs"
-            >
-              ✕
-            </button>
-            <p className="font-bold text-emerald-700 mb-1 flex items-center gap-1">
-              <BotIcon className="w-4 h-4" /> AI Asisten:
-            </p>
+          <div className="bg-white p-4 rounded-2xl shadow-2xl border border-emerald-50 max-w-[260px] text-xs pointer-events-auto animate-in slide-in-from-bottom-4">
+            <button onClick={() => setAiResponse('')} className="float-right text-emerald-300 ml-2">✕</button>
+            <p className="font-bold text-emerald-800 mb-1">🤖 AI Asisten:</p>
             {aiResponse}
           </div>
         )}
         <button 
           onClick={askAI}
-          disabled={isAiLoading}
-          className="w-14 h-14 bg-emerald-800 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all group overflow-hidden"
+          className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform active:scale-90 pointer-events-auto ${hasApiKey ? 'bg-emerald-800 text-white' : 'bg-emerald-100 text-emerald-300'}`}
         >
-          {isAiLoading ? (
-             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-          ) : (
-            <BotIcon className="w-7 h-7" />
-          )}
-          <span className="absolute right-full mr-3 bg-emerald-900 text-white px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            Butuh Bantuan?
-          </span>
+          {isAiLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" /> : <BotIcon className="w-6 h-6" />}
         </button>
       </div>
     </div>
